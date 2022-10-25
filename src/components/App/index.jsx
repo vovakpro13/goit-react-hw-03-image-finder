@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Component } from 'react';
 import { TailSpin } from 'react-loader-spinner';
 
 import Searchbar from 'components/Searchbar';
@@ -6,63 +6,87 @@ import ImageGallery from 'components/ImageGallery';
 import Button from 'components/Button';
 import styles from 'components/App/style.module.css';
 
-export const App = () => {
-  const [page, setPage] = useState(1);
-  const [query, setQuery] = useState('');
-  const [isLoading, setLoading] = useState(false);
-  const [total, setTotal] = useState(0);
-  const [images, setImages] = useState([]);
+export class App extends Component {
+  constructor(props) {
+    super(props);
 
-  const fetchImages = useCallback(() => {
-    setLoading(true);
+    this.state = {
+      page: 1,
+      query: '',
+      isLoading: false,
+      total: 0,
+      images: [],
+    };
+
+    this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleLoadMore = this.handleLoadMore.bind(this);
+  }
+
+  componentDidUpdate(prevProps, prevState, snapshot) {
+    const { page, query } = this.state;
+
+    if (prevState.page !== page || prevState.query !== query) {
+      this.fetchImages();
+    }
+  }
+
+  fetchImages() {
+    this.setState({ isLoading: true });
+
+    const { query, page } = this.state;
 
     fetch(
       `https://pixabay.com/api/?q=${query}&page=${page}&key=${process.env.REACT_APP_API_KEY}&image_type=photo&orientation=horizontal&per_page=12`
     )
       .then(res => res.json())
       .then(({ total, hits }) => {
-        setTotal(total);
-        setImages(prev => prev.concat(hits));
+        this.setState(({ images }) => ({
+          images: [...images, ...hits],
+          total,
+        }));
       })
       .catch(reason => alert(reason.message))
-      .finally(() => setLoading(false));
-  }, [query, page, setTotal, setImages, setLoading]);
+      .finally(() => this.setState({ isLoading: false }));
+  }
 
-  useEffect(() => {
-    if (query?.length) fetchImages();
-  }, [page, query, fetchImages]);
-
-  const handleSubmit = e => {
+  handleSubmit(e) {
     e.preventDefault();
     const value = e.target[1].value;
 
-    setImages([]);
+    this.setState({ images: [] });
 
     if (!!value?.length) {
-      if (page !== 1) setPage(1);
-      return setQuery(value);
+      if (this.state.page !== 1) this.setState({ page: 1 });
+
+      return this.setState({ query: value });
     }
-  };
+  }
 
-  const handleLoadMore = () => setPage(prev => prev + 1);
+  handleLoadMore() {
+    this.setState(({ page }) => ({ page: page + 1 }));
+  }
 
-  return (
-    <div className={styles.App}>
-      <Searchbar onSubmit={handleSubmit} />
+  render() {
+    const { images, isLoading, total } = this.state;
 
-      <ImageGallery images={images} />
+    return (
+      <div className={styles.App}>
+        <Searchbar onSubmit={this.handleSubmit} />
 
-      <TailSpin
-        height="80"
-        width="80"
-        color="#4fa94d"
-        radius="1"
-        visible={isLoading}
-      />
+        <ImageGallery images={images} />
 
-      {!!images.length && total > images.length && (
-        <Button onClick={handleLoadMore} />
-      )}
-    </div>
-  );
-};
+        <TailSpin
+          height="80"
+          width="80"
+          color="#4fa94d"
+          radius="1"
+          visible={isLoading}
+        />
+
+        {!!images.length && total > images.length && (
+          <Button onClick={this.handleLoadMore} />
+        )}
+      </div>
+    );
+  }
+}
